@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { errorHandler } from '../middleware/error.js';
+import authRoutes from '../routes/auth.routes.js';
+import userRoutes from '../routes/user.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +23,9 @@ app.use(express.urlencoded({ extended: true }));
 
 const uploadsPath = path.join(__dirname, '../../', process.env.UPLOADS_DIR || 'uploads');
 app.use('/uploads', express.static(uploadsPath));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
