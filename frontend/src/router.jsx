@@ -16,7 +16,10 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <CatalogPage /> },
       { path: 'comics/:id', element: <ComicPage /> },
-      { path: 'reader/:comicId/:chapterId', element: <ReaderPage /> },
+      {
+        path: 'reader/:comicId/:chapterId',
+        element: <PrivateRoute><ReaderPage /></PrivateRoute>,
+      },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {
