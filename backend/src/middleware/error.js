@@ -1,8 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, _req, res, _next) {
-  if (process.env.NODE_ENV === 'development') {
-    console.error(err);
-  }
+  console.error('[ERROR]', err);
 
   if (err.name === 'MulterError') {
     return res.status(400).json({ message: `Upload error: ${err.message}` });
@@ -25,9 +23,7 @@ export function errorHandler(err, _req, res, _next) {
     return res.status(err.status).json({ message: err.message });
   }
 
-  res.status(500).json({
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
-  });
+  res.status(500).json({ message: err.message });
 }
 
 export function createError(status, message) {
