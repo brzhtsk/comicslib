@@ -8,6 +8,9 @@ import userRoutes from '../routes/user.routes.js';
 import comicRoutes from '../routes/comic.routes.js';
 import genreRoutes from '../routes/genre.routes.js';
 import chapterRoutes from '../routes/chapter.routes.js';
+import collectionRoutes from '../routes/collection.routes.js';
+import commentRoutes from '../routes/comment.routes.js';
+import likeRoutes from '../routes/like.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +34,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/comics', comicRoutes);
 app.use('/api/comics/:comicId/chapters', chapterRoutes);
+app.use('/api/comics/:comicId/comments', commentRoutes);
+app.use('/api/comics/:comicId/likes', likeRoutes);
+app.use('/api/collections', collectionRoutes);
 app.use('/api/genres', genreRoutes);
 
 app.get('/api/health', (_req, res) => {

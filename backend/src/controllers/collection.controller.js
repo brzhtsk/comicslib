@@ -1,0 +1,65 @@
+import * as collectionService from '../services/collection.service.js';
+
+export async function getCollectionsHandler(req, res, next) {
+  try {
+    const collections = await collectionService.getUserCollections(req.user.id);
+    res.json(collections);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function addToCollectionHandler(req, res, next) {
+  try {
+    const { comicId, status } = req.body;
+
+    if (!comicId || !status) {
+      return res.status(400).json({ message: 'comicId та status обовʼязкові' });
+    }
+
+    const VALID = ['READING', 'COMPLETED', 'PLANNED', 'FAVOURITE'];
+    if (!VALID.includes(status)) {
+      return res.status(400).json({ message: `status має бути одним із: ${VALID.join(', ')}` });
+    }
+
+    const result = await collectionService.addToCollection(
+      req.user.id,
+      parseInt(comicId),
+      status,
+    );
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function removeFromCollectionHandler(req, res, next) {
+  try {
+    const { comicId, status } = req.body;
+
+    if (!comicId || !status) {
+      return res.status(400).json({ message: 'comicId та status обовʼязкові' });
+    }
+
+    await collectionService.removeFromCollection(
+      req.user.id,
+      parseInt(comicId),
+      status,
+    );
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getComicStatusHandler(req, res, next) {
+  try {
+    const comicId = parseInt(req.params.comicId);
+    if (isNaN(comicId)) return res.status(400).json({ message: 'Невірний id' });
+
+    const statuses = await collectionService.getComicCollectionStatus(req.user.id, comicId);
+    res.json({ comicId, statuses });
+  } catch (err) {
+    next(err);
+  }
+}
