@@ -1,5 +1,11 @@
 import * as comicService from '../services/comic.service.js';
 
+function parseGenreIds(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(Number);
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
 export async function getComicsHandler(req, res, next) {
   try {
     const { page, size, sortBy, order, genre, status, search } = req.query;
@@ -31,8 +37,8 @@ export async function createComicHandler(req, res, next) {
       title,
       description,
       status,
-      genreIds: genreIds ? JSON.parse(genreIds) : [],
-      tagIds: tagIds ? JSON.parse(tagIds) : [],
+      genreIds: parseGenreIds(genreIds),
+      tagIds: parseGenreIds(tagIds),
     };
 
     const comic = await comicService.createComic(parsed, req.user.id, req.file);
@@ -53,8 +59,8 @@ export async function updateComicHandler(req, res, next) {
       title,
       description,
       status,
-      genreIds: genreIds ? JSON.parse(genreIds) : undefined,
-      tagIds: tagIds ? JSON.parse(tagIds) : undefined,
+      genreIds: genreIds !== undefined ? parseGenreIds(genreIds) : undefined,
+      tagIds: tagIds !== undefined ? parseGenreIds(tagIds) : undefined,
     };
 
     const comic = await comicService.updateComic(id, req.user.id, parsed, req.file);

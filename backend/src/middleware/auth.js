@@ -28,6 +28,27 @@ export async function authenticate(req, res, next) {
   }
 }
 
+// Читає токен якщо є, але не блокує запит якщо немає.
+// Використовується для публічних маршрутів де авторизація опціональна.
+export async function optionalAuth(req, _res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+    const token = authHeader.split(' ')[1];
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { id: true, username: true, email: true, role: true },
+    });
+    if (user) req.user = user;
+  } catch {
+    // токен невалідний — просто ігноруємо, продовжуємо як гість
+  }
+  next();
+}
+
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {

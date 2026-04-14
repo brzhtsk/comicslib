@@ -8,14 +8,14 @@ import {
   getMyComicsHandler,
   getComicStatsHandler,
 } from '../controllers/comic.controller.js';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate, optionalAuth, requireRole } from '../middleware/auth.js';
 import { uploadCover } from '../middleware/upload.js';
 
 const router = Router();
 
 router.get('/', getComicsHandler);
 router.get('/my', authenticate, requireRole('AUTHOR'), getMyComicsHandler);
-router.get('/:id', authenticate, getComicHandler);
+router.get('/:id', optionalAuth, getComicHandler);
 router.get('/:id/stats', authenticate, requireRole('AUTHOR'), getComicStatsHandler);
 
 router.post('/', authenticate, requireRole('AUTHOR'), uploadCover, createComicHandler);
