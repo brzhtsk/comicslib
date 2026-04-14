@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { errorHandler } from '../middleware/error.js';
 import authRoutes from '../routes/auth.routes.js';
 import userRoutes from '../routes/user.routes.js';
+import comicRoutes from '../routes/comic.routes.js';
+import genreRoutes from '../routes/genre.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +28,8 @@ app.use('/uploads', express.static(uploadsPath));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/comics', comicRoutes);
+app.use('/api/genres', genreRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
