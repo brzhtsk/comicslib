@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  READER
+  AUTHOR
+}
+
+enum ComicStatus {
+  ONGOING
+  COMPLETED
+  HIATUS
+}
+
+enum CollectionStatus {
+  READING
+  COMPLETED
+  PLANNED
+  FAVOURITE
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique @db.VarChar(50)
+  email       String   @unique @db.VarChar(255)
+  password    String
+  role        Role     @default(READER)
+  avatarUrl   String?
+  bio         String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comics      Comic[]
+  collections Collection[]
+  comments    Comment[]
+  likes       Like[]
+  views       ComicView[]
+
+  @@map("users")
+}
+
+model Comic {
+  id          Int         @id @default(autoincrement())
+  title       String      @db.VarChar(255)
+  description String?     @db.Text
+  coverUrl    String?
+  status      ComicStatus @default(ONGOING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  authorId    Int
+  author      User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  chapters    Chapter[]
+  genres      ComicGenre[]
+  tags        ComicTag[]
+  collections CollectionItem[]
+  comments    Comment[]
+  likes       Like[]
+  views       ComicView[]
+
+  @@map("comics")
+}
+
+model Chapter {
+  id        Int      @id @default(autoincrement())
+  title     String?  @db.VarChar(255)
+  number    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comicId   Int
+  comic     Comic    @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  pages    ChapterPage[]
+  comments Comment[]
+  likes    Like[]
+
+  @@unique([comicId, number])
+  @@map("chapters")
+}
+
+model ChapterPage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  order     Int
+  createdAt DateTime @default(now())
+
+  chapterId Int
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, order])
+  @@map("chapter_pages")
+}
+
+model Genre {
+  id     Int          @id @default(autoincrement())
+  name   String       @unique @db.VarChar(100)
+  comics ComicGenre[]
+
+  @@map("genres")
+}
+
+model ComicGenre {
+  comicId Int
+  genreId Int
+
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([comicId, genreId])
+  @@map("comic_genres")
+}
+
+model Tag {
+  id     Int        @id @default(autoincrement())
+  name   String     @unique @db.VarChar(100)
+  comics ComicTag[]
+
+  @@map("tags")
+}
+
+model ComicTag {
+  comicId Int
+  tagId   Int
+
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([comicId, tagId])
+  @@map("comic_tags")
+}
+
+model Collection {
+  id        Int              @id @default(autoincrement())
+  status    CollectionStatus
+  createdAt DateTime         @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items CollectionItem[]
+
+  @@unique([userId, status])
+  @@map("collections")
+}
+
+model CollectionItem {
+  id      Int      @id @default(autoincrement())
+  addedAt DateTime @default(now())
+
+  collectionId Int
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  comicId Int
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, comicId])
+  @@map("collection_items")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comicId Int
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  chapterId Int?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comicId Int
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  chapterId Int?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, comicId, chapterId])
+  @@map("likes")
+}
+
+model ComicView {
+  id       Int      @id @default(autoincrement())
+  viewedAt DateTime @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comicId Int
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, comicId])
+  @@map("comic_views")
+}
