@@ -33,6 +33,17 @@ async function main() {
   });
 
   await prisma.user.upsert({
+    where: { email: 'translator@comicslib.ua' },
+    update: {},
+    create: {
+      username: 'test_translator',
+      email: 'translator@comicslib.ua',
+      password: hashedPassword,
+      role: 'TRANSLATOR',
+    },
+  });
+
+  await prisma.user.upsert({
     where: { email: 'reader@comicslib.ua' },
     update: {},
     create: {

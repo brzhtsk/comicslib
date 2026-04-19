@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   READER
   AUTHOR
+  TRANSLATOR
 }
 
 enum ComicStatus {
@@ -25,6 +26,11 @@ enum CollectionStatus {
   FAVOURITE
 }
 
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
 model User {
   id          Int      @id @default(autoincrement())
   username    String   @unique @db.VarChar(50)
@@ -36,26 +42,31 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  comics      Comic[]
-  collections Collection[]
-  comments    Comment[]
-  likes       Like[]
-  views       ComicView[]
+  comics           Comic[]         @relation("AuthorComics")
+  translatedComics Comic[]         @relation("TranslatorComics")
+  collections      Collection[]
+  comments         Comment[]
+  commentReactions CommentReaction[]
+  likes            Like[]
+  views            ComicView[]
 
   @@map("users")
 }
 
 model Comic {
-  id          Int         @id @default(autoincrement())
-  title       String      @db.VarChar(255)
-  description String?     @db.Text
-  coverUrl    String?
-  status      ComicStatus @default(ONGOING)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id           Int         @id @default(autoincrement())
+  title        String      @db.VarChar(255)
+  description  String?     @db.Text
+  coverUrl     String
+  status       ComicStatus @default(ONGOING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  authorId    Int
-  author      User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId     Int
+  author       User        @relation("AuthorComics", fields: [authorId], references: [id], onDelete: Cascade)
+
+  translatorId Int?
+  translator   User?       @relation("TranslatorComics", fields: [translatorId], references: [id], onDelete: SetNull)
 
   chapters    Chapter[]
   genres      ComicGenre[]
@@ -180,7 +191,29 @@ model Comment {
   chapterId Int?
   chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
+  // Самопосилання для відповідей на коментарі
+  parentId Int?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+
+  reactions CommentReaction[]
+
   @@map("comments")
+}
+
+model CommentReaction {
+  id        Int          @id @default(autoincrement())
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  commentId Int
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@map("comment_reactions")
 }
 
 model Like {
