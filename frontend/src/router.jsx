@@ -7,6 +7,7 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import NotFoundPage from './pages/NotFoundPage.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
 
 const router = createBrowserRouter([
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
         path: 'upload/:id',
         element: <PrivateRoute roles={['AUTHOR']}><UploadPage /></PrivateRoute>,
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);
