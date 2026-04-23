@@ -4,47 +4,75 @@ import { getPagination, buildPaginationMeta } from '../utils/pagination.utils.js
 
 const userSelect = { select: { id: true, username: true, avatarUrl: true } };
 
-function formatComment(c) {
+const commentInclude = {
+  user:       userSelect,
+  reactions:  { select: { userId: true, type: true } },
+  _count:     { select: { replies: true } },
+};
+
+function buildRepliesInclude(depth = 3) {
+  if (depth === 0) return commentInclude;
   return {
-    ...c,
-    likesCount:    c._count?.reactions ?? 0,
-    repliesCount:  c._count?.replies   ?? 0,
-    replies: c.replies?.map(formatComment) ?? [],
+    ...commentInclude,
+    replies: {
+      orderBy: { createdAt: 'asc' },
+      include: buildRepliesInclude(depth - 1),
+    },
   };
 }
 
-const commentInclude = {
-  user: userSelect,
-  _count: { select: { reactions: true, replies: true } },
-};
+function formatComment(c, depth = 0, currentUserId = null) {
+  const likes = (c.reactions ?? []).filter((r) => r.type === 'LIKE').length;
+  const userLiked = currentUserId
+    ? (c.reactions ?? []).some((r) => r.userId === currentUserId && r.type === 'LIKE')
+    : false;
 
-export async function getComments({ comicId, chapterId, parentId, page, size }) {
+  return {
+    id:          c.id,
+    text:        c.text,
+    createdAt:   c.createdAt,
+    updatedAt:   c.updatedAt,
+    user:        c.user,
+    comicId:     c.comicId,
+    chapterId:   c.chapterId,
+    parentId:    c.parentId,
+    depth,
+    likesCount:  likes,
+    userLiked,
+    repliesCount: c._count?.replies ?? 0,
+    replies: (c.replies ?? []).map((r) => formatComment(r, depth + 1, currentUserId)),
+  };
+}
+
+function countAll(comments) {
+  return comments.reduce((acc, c) => acc + 1 + countAll(c.replies ?? []), 0);
+}
+
+export async function getComments({ comicId, chapterId, page, size, currentUserId = null }) {
   const { skip, take, page: p, size: s } = getPagination(page, size);
 
   const where = {
     comicId,
-    chapterId:  chapterId ? parseInt(chapterId) : null,
-    parentId:   parentId  ? parseInt(parentId)  : null,
+    chapterId: chapterId ? parseInt(chapterId) : null,
+    parentId:  null,
   };
 
-  const [comments, total] = await Promise.all([
+  const [comments, rootTotal] = await Promise.all([
     prisma.comment.findMany({
       where,
-      skip,
-      take,
+      skip, take,
       orderBy: { createdAt: 'desc' },
-      include: {
-        ...commentInclude,
-        replies: {
-          orderBy: { createdAt: 'asc' },
-          include: commentInclude,
-        },
-      },
+      include: buildRepliesInclude(3),
     }),
     prisma.comment.count({ where }),
   ]);
 
-  return { data: comments.map(formatComment), meta: buildPaginationMeta(total, p, s) };
+  const formatted = comments.map((c) => formatComment(c, 0, currentUserId));
+
+  return {
+    data: formatted,
+    meta: { ...buildPaginationMeta(rootTotal, p, s), totalWithReplies: countAll(formatted) },
+  };
 }
 
 export async function createComment(userId, comicId, text, chapterId, parentId) {
@@ -62,20 +90,11 @@ export async function createComment(userId, comicId, text, chapterId, parentId) 
   }
 
   const comment = await prisma.comment.create({
-    data: {
-      text,
-      userId,
-      comicId,
-      chapterId:  chapterId ?? null,
-      parentId:   parentId  ?? null,
-    },
-    include: {
-      ...commentInclude,
-      replies: { include: commentInclude },
-    },
+    data: { text, userId, comicId, chapterId: chapterId ?? null, parentId: parentId ?? null },
+    include: buildRepliesInclude(0),
   });
 
-  return formatComment(comment);
+  return formatComment(comment, 0, userId);
 }
 
 export async function updateComment(id, userId, text) {
@@ -84,14 +103,10 @@ export async function updateComment(id, userId, text) {
   if (comment.userId !== userId) throw createError(403, 'Немає прав для редагування');
 
   const updated = await prisma.comment.update({
-    where:   { id },
-    data:    { text },
-    include: {
-      ...commentInclude,
-      replies: { include: commentInclude },
-    },
+    where: { id }, data: { text },
+    include: buildRepliesInclude(0),
   });
-  return formatComment(updated);
+  return formatComment(updated, 0, userId);
 }
 
 export async function deleteComment(id, userId) {
@@ -101,7 +116,8 @@ export async function deleteComment(id, userId) {
   await prisma.comment.delete({ where: { id } });
 }
 
-export async function reactToComment(userId, commentId, type) {
+// Тільки лайки (LIKE). Повторний клік — знімає.
+export async function toggleCommentLike(userId, commentId) {
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
   if (!comment) throw createError(404, 'Коментар не знайдено');
 
@@ -110,21 +126,12 @@ export async function reactToComment(userId, commentId, type) {
   });
 
   if (existing) {
-    if (existing.type === type) {
-      // Повторний клік — знімаємо реакцію
-      await prisma.commentReaction.delete({
-        where: { userId_commentId: { userId, commentId } },
-      });
-      return { reaction: null };
-    }
-    // Змінюємо тип реакції
-    await prisma.commentReaction.update({
-      where: { userId_commentId: { userId, commentId } },
-      data:  { type },
-    });
-    return { reaction: type };
+    await prisma.commentReaction.delete({ where: { userId_commentId: { userId, commentId } } });
+    const count = await prisma.commentReaction.count({ where: { commentId, type: 'LIKE' } });
+    return { liked: false, likesCount: count, commentId };
   }
 
-  await prisma.commentReaction.create({ data: { userId, commentId, type } });
-  return { reaction: type };
+  await prisma.commentReaction.create({ data: { userId, commentId, type: 'LIKE' } });
+  const count = await prisma.commentReaction.count({ where: { commentId, type: 'LIKE' } });
+  return { liked: true, likesCount: count, commentId };
 }

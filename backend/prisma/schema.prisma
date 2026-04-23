@@ -19,11 +19,12 @@ enum ComicStatus {
   HIATUS
 }
 
-enum CollectionStatus {
+enum CollectionType {
   READING
   COMPLETED
   PLANNED
   FAVOURITE
+  CUSTOM
 }
 
 enum ReactionType {
@@ -42,8 +43,8 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  comics           Comic[]         @relation("AuthorComics")
-  translatedComics Comic[]         @relation("TranslatorComics")
+  publishedComics  Comic[]           @relation("PublisherComics")
+  translatedComics Comic[]           @relation("TranslatorComics")
   collections      Collection[]
   comments         Comment[]
   commentReactions CommentReaction[]
@@ -59,11 +60,12 @@ model Comic {
   description  String?     @db.Text
   coverUrl     String
   status       ComicStatus @default(ONGOING)
+  authorName   String      @db.VarChar(255)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  authorId     Int
-  author       User        @relation("AuthorComics", fields: [authorId], references: [id], onDelete: Cascade)
+  publisherId  Int
+  publisher    User        @relation("PublisherComics", fields: [publisherId], references: [id], onDelete: Cascade)
 
   translatorId Int?
   translator   User?       @relation("TranslatorComics", fields: [translatorId], references: [id], onDelete: SetNull)
@@ -121,9 +123,8 @@ model Genre {
 model ComicGenre {
   comicId Int
   genreId Int
-
-  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  genre   Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@id([comicId, genreId])
   @@map("comic_genres")
@@ -140,28 +141,31 @@ model Tag {
 model ComicTag {
   comicId Int
   tagId   Int
-
-  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
-  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([comicId, tagId])
   @@map("comic_tags")
 }
 
+// Колекція: type=CUSTOM означає власну, решта — базові системні
 model Collection {
-  id        Int              @id @default(autoincrement())
-  status    CollectionStatus
-  createdAt DateTime         @default(now())
+  id        Int            @id @default(autoincrement())
+  name      String         @db.VarChar(100)
+  type      CollectionType @default(CUSTOM)
+  createdAt DateTime       @default(now())
 
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   items CollectionItem[]
 
-  @@unique([userId, status])
+  // Унікальність: один базовий тип на юзера АБО унікальна назва для CUSTOM
+  @@unique([userId, type, name])
   @@map("collections")
 }
 
+// Виключна логіка: один комікс — одна колекція одного юзера
 model CollectionItem {
   id      Int      @id @default(autoincrement())
   addedAt DateTime @default(now())
@@ -172,7 +176,9 @@ model CollectionItem {
   comicId Int
   comic   Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
 
-  @@unique([collectionId, comicId])
+  userId Int
+
+  @@unique([userId, comicId])
   @@map("collection_items")
 }
 
@@ -191,7 +197,6 @@ model Comment {
   chapterId Int?
   chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
-  // Самопосилання для відповідей на коментарі
   parentId Int?
   parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies  Comment[] @relation("CommentReplies")
