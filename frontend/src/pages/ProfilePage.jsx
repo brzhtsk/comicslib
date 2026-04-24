@@ -4,6 +4,7 @@ import { useAuth } from '../store/authStore.jsx';
 import { getMyProfile, updateMyProfile, getActivityStats } from '../api/user.api.js';
 import { getCollections, deleteCollection, setComicCollection, createCollection } from '../api/collection.api.js';
 import { getMyComics, getComicStats, deleteComic } from '../api/comic.api.js';
+import { plural } from '../components/CommentSection.jsx';
 
 const STATUS_LABELS = { ONGOING: 'Виходить', COMPLETED: 'Завершено', HIATUS: 'Призупинено' };
 const TYPE_ORDER    = { READING: 0, COMPLETED: 1, PLANNED: 2, FAVOURITE: 3, CUSTOM: 4 };
@@ -348,7 +349,7 @@ export default function ProfilePage() {
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link to={`/comics/${comic.id}`} className="text-sm font-medium text-gray-900 truncate hover:text-indigo-600 transition-colors block">{comic.title}</Link>
-                    <p className="text-xs text-gray-500">{STATUS_LABELS[comic.status]} · {comic.chaptersCount ?? 0} глав</p>
+                    <p className="text-xs text-gray-500">{STATUS_LABELS[comic.status]} · {plural(comic.chaptersCount ?? 0, 'глава', 'глави', 'глав')}</p>
                   </div>
                   <div className="flex gap-3 shrink-0">
                     <Link to={`/upload/${comic.id}`} className="text-xs text-gray-500 hover:text-indigo-600 transition-colors">Редагувати</Link>

@@ -27,19 +27,22 @@ export default function ReaderPage() {
   const cId  = parseInt(comicId);
   const chId = parseInt(chapterId);
 
-  const [chapter, setChapter]             = useState(null);
-  const [chapters, setChapters]           = useState([]);
-  const [currentPage, setCurrentPage]     = useState(0);
-  const [liked, setLiked]                 = useState(false);
-  const [likeCount, setLikeCount]         = useState(0);
-  const [initialComments, setInitialComments] = useState([]);
-  const [showComments, setShowComments]   = useState(false);
-  const [loading, setLoading]             = useState(true);
+  const [chapter, setChapter]           = useState(null);
+  const [chapters, setChapters]         = useState([]);
+  const [currentPage, setCurrentPage]   = useState(0);
+  const [liked, setLiked]               = useState(false);
+  const [likeCount, setLikeCount]       = useState(0);
+  const [comments, setComments]         = useState([]);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [loading, setLoading]           = useState(true);
 
   useEffect(() => {
     setLoading(true);
     setCurrentPage(0);
     setShowComments(false);
+    setComments([]);
+    setCommentsLoaded(false);
     Promise.all([getChapter(cId, chId), getChapters(cId)])
       .then(([chRes, chsRes]) => { setChapter(chRes.data); setChapters(chsRes.data); })
       .finally(() => setLoading(false));
@@ -47,13 +50,20 @@ export default function ReaderPage() {
 
   useEffect(() => {
     if (!user) return;
-    getLikeStatus(cId, { chapterId: chId }).then((res) => { setLiked(res.data.liked); setLikeCount(res.data.count); });
+    getLikeStatus(cId, { chapterId: chId }).then((res) => {
+      setLiked(res.data.liked);
+      setLikeCount(res.data.count);
+    });
   }, [cId, chId, user]);
 
+  // Завантажуємо коментарі при першому відкритті секції
   useEffect(() => {
-    if (!showComments) return;
-    getComments(cId, { chapterId: chId }).then((res) => setInitialComments(res.data.data ?? []));
-  }, [showComments, cId, chId]);
+    if (!showComments || commentsLoaded) return;
+    getComments(cId, { chapterId: chId }).then((res) => {
+      setComments(res.data.data ?? []);
+      setCommentsLoaded(true);
+    });
+  }, [showComments, commentsLoaded, cId, chId]);
 
   const goToPrev = useCallback(() => {
     if (currentPage > 0) { setCurrentPage((p) => p - 1); window.scrollTo(0, 0); }
@@ -118,7 +128,6 @@ export default function ReaderPage() {
         </div>
       </div>
 
-      {/* Image viewer */}
       {totalPages > 0 ? (
         <>
           <div className="relative bg-black rounded-xl overflow-hidden select-none">
@@ -133,13 +142,13 @@ export default function ReaderPage() {
             <button onClick={goToNext} disabled={currentPage === totalPages - 1} className="absolute right-0 top-0 h-full w-1/3 cursor-pointer disabled:cursor-default" />
           </div>
 
-          {/* Bottom controls */}
           <div className="flex items-center justify-between mt-4 gap-3">
             <button onClick={goToPrev} disabled={currentPage === 0} className="flex items-center gap-1.5 text-sm px-4 py-2 border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">
               <ChevronLeft /> Назад
             </button>
 
             <div className="flex items-center gap-2">
+              {/* Select показує "1/10" поки закритий, "Сторінка 1" — у списку */}
               <select
                 value={currentPage}
                 onChange={(e) => { setCurrentPage(parseInt(e.target.value)); window.scrollTo(0, 0); }}
@@ -149,7 +158,9 @@ export default function ReaderPage() {
                   <option key={i} value={i}>Сторінка {i + 1}</option>
                 ))}
               </select>
-              <span className="text-sm text-gray-500 shrink-0">{currentPage + 1}/{totalPages}</span>
+              <span className="text-sm text-gray-500 shrink-0 tabular-nums">
+                {currentPage + 1}/{totalPages}
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -157,7 +168,8 @@ export default function ReaderPage() {
                 onClick={handleLike}
                 className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors ${liked ? 'bg-rose-50 border-rose-200 text-rose-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
               >
-                <HeartIcon filled={liked} /> {likeCount > 0 && likeCount}
+                <HeartIcon filled={liked} />
+                {likeCount > 0 && <span>{likeCount}</span>}
               </button>
               <button
                 onClick={() => setShowComments((s) => !s)}
@@ -178,15 +190,20 @@ export default function ReaderPage() {
         <p className="text-center py-12 text-gray-500">Сторінок у главі немає</p>
       )}
 
-      {/* Comments */}
       {showComments && (
         <div className="mt-8">
-          <CommentSection
-            comicId={cId}
-            chapterId={chId}
-            initialComments={initialComments}
-            user={user}
-          />
+          {commentsLoaded ? (
+            <CommentSection
+              comicId={cId}
+              chapterId={chId}
+              initialComments={comments}
+              user={user}
+            />
+          ) : (
+            <div className="flex justify-center py-6">
+              <div className="w-6 h-6 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin" />
+            </div>
+          )}
         </div>
       )}
     </div>

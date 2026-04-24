@@ -24,7 +24,7 @@ export default function Header() {
 
           {user ? (
             <>
-              {user.role === 'AUTHOR' && (
+              {user.role === 'AUTHOR' || user.role === 'TRANSLATOR' && (
                 <Link to="/upload" className="text-sm text-gray-600 hover:text-gray-900">
                   Завантажити
                 </Link>

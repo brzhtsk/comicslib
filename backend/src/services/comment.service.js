@@ -2,15 +2,16 @@ import prisma from '../config/db.js';
 import { createError } from '../middleware/error.js';
 import { getPagination, buildPaginationMeta } from '../utils/pagination.utils.js';
 
+const MAX_DEPTH = 2; // 0-based: рівні 0, 1, 2
 const userSelect = { select: { id: true, username: true, avatarUrl: true } };
 
 const commentInclude = {
-  user:       userSelect,
-  reactions:  { select: { userId: true, type: true } },
-  _count:     { select: { replies: true } },
+  user:      userSelect,
+  reactions: { select: { userId: true, type: true } },
+  _count:    { select: { replies: true } },
 };
 
-function buildRepliesInclude(depth = 3) {
+function buildRepliesInclude(depth = MAX_DEPTH) {
   if (depth === 0) return commentInclude;
   return {
     ...commentInclude,
@@ -22,22 +23,17 @@ function buildRepliesInclude(depth = 3) {
 }
 
 function formatComment(c, depth = 0, currentUserId = null) {
-  const likes = (c.reactions ?? []).filter((r) => r.type === 'LIKE').length;
+  const likes     = (c.reactions ?? []).filter((r) => r.type === 'LIKE').length;
   const userLiked = currentUserId
     ? (c.reactions ?? []).some((r) => r.userId === currentUserId && r.type === 'LIKE')
     : false;
 
   return {
-    id:          c.id,
-    text:        c.text,
-    createdAt:   c.createdAt,
-    updatedAt:   c.updatedAt,
-    user:        c.user,
-    comicId:     c.comicId,
-    chapterId:   c.chapterId,
-    parentId:    c.parentId,
+    id: c.id, text: c.text, createdAt: c.createdAt,
+    updatedAt: c.updatedAt, user: c.user,
+    comicId: c.comicId, chapterId: c.chapterId, parentId: c.parentId,
     depth,
-    likesCount:  likes,
+    likesCount:   likes,
     userLiked,
     repliesCount: c._count?.replies ?? 0,
     replies: (c.replies ?? []).map((r) => formatComment(r, depth + 1, currentUserId)),
@@ -46,6 +42,17 @@ function formatComment(c, depth = 0, currentUserId = null) {
 
 function countAll(comments) {
   return comments.reduce((acc, c) => acc + 1 + countAll(c.replies ?? []), 0);
+}
+
+// Обчислює глибину коментаря рекурсивно
+async function getCommentDepth(commentId) {
+  let depth = 0;
+  let current = await prisma.comment.findUnique({ where: { id: commentId }, select: { parentId: true } });
+  while (current?.parentId) {
+    depth++;
+    current = await prisma.comment.findUnique({ where: { id: current.parentId }, select: { parentId: true } });
+  }
+  return depth;
 }
 
 export async function getComments({ comicId, chapterId, page, size, currentUserId = null }) {
@@ -59,16 +66,14 @@ export async function getComments({ comicId, chapterId, page, size, currentUserI
 
   const [comments, rootTotal] = await Promise.all([
     prisma.comment.findMany({
-      where,
-      skip, take,
+      where, skip, take,
       orderBy: { createdAt: 'desc' },
-      include: buildRepliesInclude(3),
+      include: buildRepliesInclude(MAX_DEPTH),
     }),
     prisma.comment.count({ where }),
   ]);
 
   const formatted = comments.map((c) => formatComment(c, 0, currentUserId));
-
   return {
     data: formatted,
     meta: { ...buildPaginationMeta(rootTotal, p, s), totalWithReplies: countAll(formatted) },
@@ -87,6 +92,12 @@ export async function createComment(userId, comicId, text, chapterId, parentId) 
   if (parentId) {
     const parent = await prisma.comment.findUnique({ where: { id: parentId } });
     if (!parent) throw createError(404, 'Батьківський коментар не знайдено');
+
+    // Перевірка максимальної глибини на бекенді
+    const parentDepth = await getCommentDepth(parentId);
+    if (parentDepth >= MAX_DEPTH) {
+      throw createError(400, 'Досягнуто максимальну глибину відповідей');
+    }
   }
 
   const comment = await prisma.comment.create({
@@ -94,14 +105,13 @@ export async function createComment(userId, comicId, text, chapterId, parentId) 
     include: buildRepliesInclude(0),
   });
 
-  return formatComment(comment, 0, userId);
+  return formatComment(comment, parentId ? await getCommentDepth(comment.id) : 0, userId);
 }
 
 export async function updateComment(id, userId, text) {
   const comment = await prisma.comment.findUnique({ where: { id } });
   if (!comment)               throw createError(404, 'Коментар не знайдено');
   if (comment.userId !== userId) throw createError(403, 'Немає прав для редагування');
-
   const updated = await prisma.comment.update({
     where: { id }, data: { text },
     include: buildRepliesInclude(0),
@@ -116,7 +126,6 @@ export async function deleteComment(id, userId) {
   await prisma.comment.delete({ where: { id } });
 }
 
-// Тільки лайки (LIKE). Повторний клік — знімає.
 export async function toggleCommentLike(userId, commentId) {
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
   if (!comment) throw createError(404, 'Коментар не знайдено');
@@ -127,11 +136,10 @@ export async function toggleCommentLike(userId, commentId) {
 
   if (existing) {
     await prisma.commentReaction.delete({ where: { userId_commentId: { userId, commentId } } });
-    const count = await prisma.commentReaction.count({ where: { commentId, type: 'LIKE' } });
-    return { liked: false, likesCount: count, commentId };
+  } else {
+    await prisma.commentReaction.create({ data: { userId, commentId, type: 'LIKE' } });
   }
 
-  await prisma.commentReaction.create({ data: { userId, commentId, type: 'LIKE' } });
   const count = await prisma.commentReaction.count({ where: { commentId, type: 'LIKE' } });
-  return { liked: true, likesCount: count, commentId };
+  return { liked: !existing, likesCount: count, commentId };
 }

@@ -7,6 +7,7 @@ import { toggleLike, getLikeStatus } from '../api/like.api.js';
 import { getCollections, getComicCollection, setComicCollection, createCollection } from '../api/collection.api.js';
 import { useAuth } from '../store/authStore.jsx';
 import CommentSection, { plural } from '../components/CommentSection.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 const STATUS_LABELS = { ONGOING: 'Виходить', COMPLETED: 'Завершено', HIATUS: 'Призупинено' };
 const TYPE_ORDER    = { READING: 0, COMPLETED: 1, PLANNED: 2, FAVOURITE: 3, CUSTOM: 4 };
@@ -132,6 +133,7 @@ export default function ComicPage() {
   const [liked, setLiked]               = useState(false);
   const [likeCount, setLikeCount]       = useState(0);
   const [showCollModal, setShowCollModal] = useState(false);
+  const [confirmModal, setConfirmModal]   = useState(null);
   const [loading, setLoading]           = useState(true);
   const [deleting, setDeleting]         = useState(false);
 
@@ -164,12 +166,16 @@ export default function ComicPage() {
     setLikeCount((c) => (res.data.liked ? c + 1 : c - 1));
   }
 
-  async function handleDeleteComic() {
-    const confirmed = window.confirm('Видалити комікс? Усі глави та коментарі також будуть видалені. Цю дію неможливо скасувати.');
-    if (!confirmed) return;
-    setDeleting(true);
-    await deleteComic(comicId);
-    navigate('/profile');
+  function handleDeleteComic() {
+    setConfirmModal({
+      message: 'Видалити комікс? Усі глави та коментарі також будуть видалені. Цю дію неможливо скасувати.',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setDeleting(true);
+        await deleteComic(comicId);
+        navigate('/profile');
+      },
+    });
   }
 
   if (loading) return (
@@ -188,6 +194,7 @@ export default function ComicPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-10">
       {showCollModal && <CollectionModal comicId={comicId} onClose={() => setShowCollModal(false)} />}
+      {confirmModal && <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />}
 
       {/* Header */}
       <div className="flex gap-8">
@@ -274,7 +281,7 @@ export default function ComicPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {plural(chapters.length, 'глава', 'глави', 'глав')}
+            Глави ({chapters.length})
           </h2>
           <button
             onClick={() => setChapterOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}

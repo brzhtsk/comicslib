@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createComment, deleteComment, toggleCommentLike } from '../api/comment.api.js';
 
-const MAX_DEPTH = 3; // 0-based: 0,1,2 = три рівні відповідей
+const MAX_DEPTH = 2; // 0, 1, 2 — три рівні (кореневий + 2 рівні відповідей)
 
-// Рекурсивно оновлює лайк у дереві
 function updateLikeInTree(comments, commentId, liked, likesCount) {
   return comments.map((c) => {
     if (c.id === commentId) return { ...c, userLiked: liked, likesCount };
@@ -31,7 +30,6 @@ export function countAll(list) {
   return list.reduce((acc, c) => acc + 1 + countAll(c.replies ?? []), 0);
 }
 
-// Одиночна іконка серця
 function HeartIcon({ filled }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,7 +39,9 @@ function HeartIcon({ filled }) {
 }
 
 function CommentItem({ comment, comicId, user, onReply, onDelete, onLike }) {
-  const canReply = (comment.depth ?? 0) < MAX_DEPTH - 1;
+  // depth приходить з сервера; для нових коментарів встановлюється вручну при insert
+  const depth    = comment.depth ?? 0;
+  const canReply = depth < MAX_DEPTH;
 
   return (
     <div className="flex gap-3">
@@ -63,11 +63,11 @@ function CommentItem({ comment, comicId, user, onReply, onDelete, onLike }) {
           <button
             onClick={() => onLike(comment.id)}
             className={`flex items-center gap-1 text-xs transition-colors ${comment.userLiked ? 'text-rose-500' : 'text-gray-400 hover:text-rose-400'}`}
-            title={user ? (comment.userLiked ? 'Прибрати вподобання' : 'Вподобати') : 'Увійдіть щоб вподобати'}
           >
             <HeartIcon filled={comment.userLiked} />
             {(comment.likesCount ?? 0) > 0 && <span>{comment.likesCount}</span>}
           </button>
+          {/* Кнопка відповіді — лише якщо глибина менше MAX_DEPTH */}
           {canReply && user && (
             <button onClick={() => onReply(comment)} className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">
               Відповісти
@@ -96,10 +96,17 @@ function CommentItem({ comment, comicId, user, onReply, onDelete, onLike }) {
 
 export default function CommentSection({ comicId, chapterId = null, initialComments = [], user }) {
   const navigate = useNavigate();
-  const [comments, setComments]   = useState(initialComments);
-  const [text, setText]           = useState('');
-  const [replyTo, setReplyTo]     = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const [comments, setComments] = useState(initialComments);
+  const [text, setText]         = useState('');
+  const [replyTo, setReplyTo]   = useState(null);
+  const [loading, setLoading]   = useState(false);
+
+  // Синхронізуємо коли initialComments оновлюються ззовні (рідер підвантажує lazy)
+  const [initialized, setInitialized] = useState(false);
+  if (!initialized && initialComments.length > 0) {
+    setComments(initialComments);
+    setInitialized(true);
+  }
 
   const total = countAll(comments);
 
@@ -114,20 +121,33 @@ export default function CommentSection({ comicId, chapterId = null, initialComme
     setComments((prev) => removeFromTree(prev, commentId));
   }, [comicId]);
 
+  // Обчислюємо depth для відповіді — depth батька + 1
+  function getReplyDepth(parentComment) {
+    return (parentComment?.depth ?? 0) + 1;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!text.trim()) return;
+
+    // Перевірка глибини перед надсиланням
+    if (replyTo && getReplyDepth(replyTo) > MAX_DEPTH) return;
+
     setLoading(true);
     try {
       const res = await createComment(comicId, {
-        text: text.trim(),
+        text:      text.trim(),
         chapterId: chapterId ?? undefined,
         parentId:  replyTo?.id ?? undefined,
       });
+
+      // Встановлюємо depth для нового коментаря на клієнті
+      const newComment = { ...res.data, depth: replyTo ? getReplyDepth(replyTo) : 0 };
+
       if (replyTo) {
-        setComments((prev) => insertReplyInTree(prev, replyTo.id, res.data));
+        setComments((prev) => insertReplyInTree(prev, replyTo.id, newComment));
       } else {
-        setComments((prev) => [res.data, ...prev]);
+        setComments((prev) => [newComment, ...prev]);
       }
       setText('');
       setReplyTo(null);
@@ -139,7 +159,7 @@ export default function CommentSection({ comicId, chapterId = null, initialComme
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-4">
-        {plural(total, 'коментар', 'коментарі', 'коментарів')}
+        Коментарі ({total})
       </h2>
 
       {user && (

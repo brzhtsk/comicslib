@@ -16,8 +16,8 @@ router.get('/', getChaptersByComicHandler);
 router.get('/:id', getChapterHandler);
 router.get('/:id/download', downloadChapterHandler);
 
-router.post('/', authenticate, requireRole('AUTHOR'), uploadChapter, createChapterHandler);
-router.put('/:id', authenticate, requireRole('AUTHOR'), uploadChapter, updateChapterHandler);
-router.delete('/:id', authenticate, requireRole('AUTHOR'), deleteChapterHandler);
+router.post('/', authenticate, requireRole('AUTHOR', 'TRANSLATOR'), uploadChapter, createChapterHandler);
+router.put('/:id', authenticate, requireRole('AUTHOR', 'TRANSLATOR'), uploadChapter, updateChapterHandler);
+router.delete('/:id', authenticate, requireRole('AUTHOR', 'TRANSLATOR'), deleteChapterHandler);
 
 export default router;

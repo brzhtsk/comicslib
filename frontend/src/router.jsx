@@ -10,6 +10,8 @@ import RegisterPage from './pages/RegisterPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
 
+const CREATOR_ROLES = ['AUTHOR', 'TRANSLATOR'];
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -21,7 +23,7 @@ const router = createBrowserRouter([
         path: 'reader/:comicId/:chapterId',
         element: <PrivateRoute><ReaderPage /></PrivateRoute>,
       },
-      { path: 'login', element: <LoginPage /> },
+      { path: 'login',    element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {
         path: 'profile',
@@ -29,11 +31,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'upload',
-        element: <PrivateRoute roles={['AUTHOR']}><UploadPage /></PrivateRoute>,
+        element: <PrivateRoute roles={CREATOR_ROLES}><UploadPage /></PrivateRoute>,
       },
       {
         path: 'upload/:id',
-        element: <PrivateRoute roles={['AUTHOR']}><UploadPage /></PrivateRoute>,
+        element: <PrivateRoute roles={CREATOR_ROLES}><UploadPage /></PrivateRoute>,
       },
       { path: '*', element: <NotFoundPage /> },
     ],
