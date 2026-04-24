@@ -19,7 +19,7 @@ const COMICS = [
     genres:      ['Фентезі', 'Екшн', 'Психологічний', 'Драма'],
   },
   {
-    title:       'Вандітамус',
+    title:       'Ванпанчмен',
     authorName:  'One',
     description: 'Людина-монстр Сайтама може перемогти будь-якого ворога одним ударом і страждає від нудьги. Гостра сатира на жанр супергероїки.',
     status:      'ONGOING',
@@ -33,11 +33,11 @@ const COMICS = [
     genres:      ['Екшн', 'Драма', 'Психологічний', 'Фентезі'],
   },
   {
-    title:       'Дитина планети',
+    title:       'Сага про Вінланд',
     authorName:  'Макото Юкімура',
-    description: 'На космічній станції народжується перша людина, виростає і мріє ступити на поверхню Землі. Вдумлива наукова фантастика про людську природу та тугу за домівкою.',
+    description: 'Історія про шлях Торфінна, сина видатного воїна, який прагне помститися за смерть батька в часи вікінгів XI століття.',
     status:      'COMPLETED',
-    genres:      ['Наукова фантастика', 'Драма', 'Пригоди'],
+    genres:      ['Пригоди', 'Драма', 'Екшн'],
   },
   {
     title:       'Токійський гуль',
@@ -54,18 +54,18 @@ const COMICS = [
     genres:      ['Екшн', 'Пригоди', 'Комедія', 'Фентезі'],
   },
   {
-    title:       'Тетрадь смерті',
-    authorName:  'Цугумі Охба',
+    title:       'Зошит смерті',
+    authorName:  'Цуґумі Охба',
     description: 'Учень Лайт Яґамі знаходить зошит, який вбиває будь-кого, чиє ім\'я в ньому записане. Психологічний трилер про межі справедливості та влади.',
     status:      'COMPLETED',
     genres:      ['Трилер', 'Психологічний', 'Детектив', 'Надприродне'],
   },
   {
-    title:       'Пірат Флатбред',
-    authorName:  'Хіромуса Окамото',
-    description: 'Легкий пригодницький комікс про молодого пекаря, який випадково потрапляє у піратський світ і вирішує завоювати його своїми кулінарними талантами.',
+    title:       'Людина-бензопила',
+    authorName:  'Фуджімото Тацукі',
+    description: 'Злиденне життя Денджі кардинально змінилося, коли він злився зі своїм ручним демоном Почітою: тепер хлопець живе у великому місті та працює мисливцем на демонів у відділі громадської безпеки.',
     status:      'ONGOING',
-    genres:      ['Пригоди', 'Комедія', 'Повсякденність'],
+    genres:      ['Драма', 'Комедія', 'Фентезі'],
   },
 ];
 
@@ -117,7 +117,7 @@ async function main() {
 
   const reader1 = await prisma.user.create({
     data: {
-      username: 'reader_diana',
+      username: 'reader',
       email:    'reader@comicslib.ua',
       password,
       role:     'READER',
@@ -127,11 +127,11 @@ async function main() {
 
   const reader2 = await prisma.user.create({
     data: {
-      username: 'otaku_max',
-      email:    'max@comicslib.ua',
+      username: 'otaku',
+      email:    'nick@comicslib.ua',
       password,
       role:     'READER',
-      bio:      'Манга та аніме — моє все.',
+      bio:      'Манга та аніме – моє все.',
     },
   });
 
@@ -143,7 +143,7 @@ async function main() {
   const createdComics = [];
 
   for (const c of COMICS) {
-    const isTranslation = c.title !== 'Пірат Флатбред'; // Власний твір — без перекладача
+    const isTranslation = c.title !== 'Людина-бензопила'; // Власний твір — без перекладача
     const publisherId   = isTranslation ? translator.id : author.id;
 
     const comic = await prisma.comic.create({
@@ -258,8 +258,8 @@ async function main() {
   console.log('\nТестові акаунти (пароль: password123):');
   console.log('  author@comicslib.ua     — Автор (mangaka)');
   console.log('  translator@comicslib.ua — Перекладач (translator_ua)');
-  console.log('  reader@comicslib.ua     — Читач (reader_diana)');
-  console.log('  max@comicslib.ua        — Читач (otaku_max)');
+  console.log('  reader@comicslib.ua     — Читач (reader)');
+  console.log('  nick@comicslib.ua        — Читач (otaku)');
   console.log('\nПримітка: обкладинки потрібно додати вручну через форму редагування коміксу.');
 }
 
